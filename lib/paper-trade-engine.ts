@@ -9,7 +9,7 @@ export function evaluatePaperTrade(trade:SimulatedTrade,observations:Observation
  ![trade.entry,trade.stop,trade.target].every(x=>Number.isFinite(x)&&x>0))return invalid("Invalid trade parameters");
  if(trade.side==="BUY"?! (trade.stop<trade.entry&&trade.entry<trade.target):!(trade.target<trade.entry&&trade.entry<trade.stop))return invalid("Stop/target ordering invalid");
  const bars=observations.slice().sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
- let previous=times[0]-1;
+ let previous=Number.NEGATIVE_INFINITY;
  for(const bar of bars){
   const time=Date.parse(bar.time);
   if(!Number.isFinite(time)||time<=previous||![bar.open,bar.high,bar.low,bar.close].every(x=>Number.isFinite(x)&&x>0)||
