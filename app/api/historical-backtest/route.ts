@@ -67,6 +67,10 @@ export async function GET(){
   const chronological={earlier70Pct:summarize(trades.filter(t=>Date.parse(t.entryAt)<cutoff)),
    later30Pct:summarize(trades.filter(t=>Date.parse(t.entryAt)>=cutoff)),cutoff:new Date(cutoff).toISOString(),
    warning:"Diagnostic split, NOT untouched out-of-sample validation: this historical sample was already examined."};
+  const exits={STOP:summarize(trades.filter(t=>t.result==="STOP")),TARGET:summarize(trades.filter(t=>t.result==="TARGET")),TIME:summarize(trades.filter(t=>t.result==="TIME"))};
+  const payoff={averageWinnerR:trades.some(t=>t.r>0)?+(trades.filter(t=>t.r>0).reduce((a,t)=>a+t.r,0)/trades.filter(t=>t.r>0).length).toFixed(3):null,
+   averageLoserR:trades.some(t=>t.r<0)?+(trades.filter(t=>t.r<0).reduce((a,t)=>a+t.r,0)/trades.filter(t=>t.r<0).length).toFixed(3):null,
+   breakEvenRoundTripCostR:trades.length?+(totalR/trades.length).toFixed(4):null};
   const costs=[0,0.05,0.1,0.2,0.3].map(costR=>({
    assumedRoundTripCostR:costR,
    totalNetR:+(totalR-costR*trades.length).toFixed(3),
@@ -76,7 +80,7 @@ export async function GET(){
    strategy:"15m EMA20/50/200 plus RSI directional bias; next-bar open entry; 1.5 ATR stop, 3 ATR target, 17 bars maximum, re-entry only after the exit candle",
    results:{trades:trades.length,wins,losses:trades.length-wins,winRatePct:trades.length?Math.round(wins/trades.length*10000)/100:null,
     totalR:Math.round(totalR*100)/100,averageR:trades.length?Math.round(totalR/trades.length*1000)/1000:null,maxDrawdownR:Math.round(maxDrawdownR*100)/100},
-   diagnostics:{directional,chronological,costSensitivity:costs,costWarning:"Hypothetical costs in R, not measured Octa spreads, commissions or slippage. Do not treat these as verified broker costs."},
+   diagnostics:{directional,chronological,exits,payoff,costSensitivity:costs,costWarning:"Hypothetical costs in R, not measured Octa spreads, commissions or slippage. Do not treat these as verified broker costs."},
    trades:trades.slice(-30),whaleFilterApplied:false,transactionCostsIncluded:false,
    decision:"NOT_VALIDATED_FOR_LIVE_TRADING",
    limitations:"Entry at bar open and intrabar stops are hypothetical; re-entry starts after the exit bar. Short, nonrandom historical sample; no spread, commission, slippage, broker contract rules, news or institutional flow. Same-candle stop wins; gaps through stop use open. Candles may contain market gaps. Results are hypothetical and not predictive."},
