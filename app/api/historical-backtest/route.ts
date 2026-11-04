@@ -2,7 +2,7 @@ import {NextResponse} from "next/server";
 import {evaluateCandles} from "../../../lib/technicals";
 import type {Candle} from "../../../lib/candles";
 export const dynamic="force-dynamic";
-type Trade={side:"BUY"|"SELL";entry:number;stop:number;target:number;entryAt:string;exitAt:string;exit:number;result:"STOP"|"TARGET"|"TIME";r:number};
+type Trade={side:"BUY"|"SELL";entry:number;stop:number;target:number;entryAt:string;exitAt:string;exit:number;result:"STOP"|"TARGET"|"TIME";r:number;dataGapAffected:boolean};
 export async function GET(){
  try{
   const ticker="GC=F";
@@ -33,9 +33,13 @@ export async function GET(){
    const stop=side==="BUY"?entry-atr*1.5:entry+atr*1.5;
    const target=side==="BUY"?entry+atr*3:entry-atr*3;
    if(stop<=0||target<=0)continue;
-   let exit=NaN,result:Trade["result"]="TIME",exitAt="",exitIndex=i+16;
+   let exit=NaN,result:Trade["result"]="TIME",exitAt="",exitIndex=i+16,dataGapAffected=false;
    for(let j=i;j<=i+16;j++){
     const c=candles[j];
+    if(j>i){
+     const elapsed=Date.parse(c.time)-Date.parse(candles[j-1].time);
+     if(elapsed>900000)dataGapAffected=true;
+    }
     // If price gaps through a stop, assume worse open. Targets are not improved by gaps.
     const gapStop=side==="BUY"?c.open<=stop:c.open>=stop;
     const hitStop=side==="BUY"?c.low<=stop:c.high>=stop;
@@ -46,7 +50,7 @@ export async function GET(){
    }
    if(!Number.isFinite(exit))continue;
    const r=(side==="BUY"?exit-entry:entry-exit)/Math.abs(entry-stop);
-   trades.push({side,entry,stop,target,entryAt:candles[i].time,exitAt,exit,result,r});
+   trades.push({side,entry,stop,target,entryAt:candles[i].time,exitAt,exit,result,r,dataGapAffected});
    // Re-entry only after the exit candle has completed; no overlapping positions.
    nextEligible=exitIndex+1;
   }
@@ -54,7 +58,7 @@ export async function GET(){
    const minutes=(Date.parse(bar.time)-Date.parse(candles[i].time))/60000;
    return minutes>15?[{after:candles[i].time,before:bar.time,minutes}]:[];
   });
-  const gapCrossingTrades=trades.filter(t=>gaps.some(g=>Date.parse(g.after)>=Date.parse(t.entryAt)&&Date.parse(g.before)<=Date.parse(t.exitAt))).length;
+  const gapCrossingTrades=trades.filter(t=>t.dataGapAffected).length;
   const equityCurve=[{time:trades[0]?.entryAt??candles[0].time,cumulativeR:0}];
   let runningR=0,lossStreak=0,maxLossStreak=0;
   for(const trade of trades){
@@ -76,6 +80,9 @@ export async function GET(){
    for(const t of subset){balance+=t.r;peak=Math.max(peak,balance);drawdown=Math.max(drawdown,peak-balance);}
    return {trades:count,wins:winning,winRatePct:count?+(100*winning/count).toFixed(2):null,totalR:+net.toFixed(3),averageR:count?+(net/count).toFixed(3):null,maxDrawdownR:+drawdown.toFixed(3)};
   };
+  const cleanTrades=trades.filter(t=>!t.dataGapAffected);
+  const gapExcluded=summarize(cleanTrades);
+  const gapAffected=summarize(trades.filter(t=>t.dataGapAffected));
   const directional={BUY:summarize(trades.filter(t=>t.side==="BUY")),SELL:summarize(trades.filter(t=>t.side==="SELL"))};
   const chronological={earlier70Pct:summarize(trades.filter(t=>Date.parse(t.entryAt)<cutoff)),
    later30Pct:summarize(trades.filter(t=>Date.parse(t.entryAt)>=cutoff)),cutoff:new Date(cutoff).toISOString(),
@@ -93,7 +100,7 @@ export async function GET(){
    strategy:"15m EMA20/50/200 plus RSI directional bias; next-bar open entry; 1.5 ATR stop, 3 ATR target, 17 bars maximum, re-entry only after the exit candle",
    results:{trades:trades.length,wins,losses:trades.length-wins,winRatePct:trades.length?Math.round(wins/trades.length*10000)/100:null,
     totalR:Math.round(totalR*100)/100,averageR:trades.length?Math.round(totalR/trades.length*1000)/1000:null,maxDrawdownR:Math.round(maxDrawdownR*100)/100},
-   dataQuality:{gapsOver15Minutes:gaps.length,gapCrossingTrades,gapExamples:gaps.slice(0,8),note:"Market closures and missing provider bars can create gaps. Trades spanning gaps may have unrealistic simulated exits."},
+   dataQuality:{gapsOver15Minutes:gaps.length,gapCrossingTrades,gapExcluded,gapAffected,gapExamples:gaps.slice(0,8),note:"Market closures and missing provider bars can create gaps. Trades spanning gaps may have unrealistic simulated exits."},
    riskDiagnostics:{maxConsecutiveLosingTrades:maxLossStreak,equityCurve},
    diagnostics:{directional,chronological,exits,payoff,costSensitivity:costs,costWarning:"Hypothetical costs in R, not measured Octa spreads, commissions or slippage. Do not treat these as verified broker costs."},
    trades,whaleFilterApplied:false,transactionCostsIncluded:false,
