@@ -1,7 +1,8 @@
 "use client";
 import {useEffect,useState} from "react";
 type Frame={status?:string;close?:number;rsi14?:number;atr14?:number;asOf?:string;patterns?:string[];error?:string};
-type Market={symbol:string;technicalBias:string;frames:Record<string,Frame>;status:string;reason:string;whaleConfirmation:string;newsClearance:string;brokerSpread:string};
+type PaperSetup={status:string;side:string|null;entry:number|null;stop:number|null;target:number|null;rewardRisk:number|null;expiresAt:string|null;maxUnitsAt2UsdRisk:number|null;reason:string};
+type Market={paperSetup?:PaperSetup;symbol:string;technicalBias:string;frames:Record<string,Frame>;status:string;reason:string;whaleConfirmation:string;newsClearance:string;brokerSpread:string};
 type WhaleCheck={comparisons?:{symbol:string;whaleStatus:string;whaleAlignment:string;explanation:string;sampledPredictionMarketTrades:number}[];whaleFeedStatus?:string};
 type Scan={status:string;decision:string;reason?:string;markets?:Market[];checkedAt?:string;warning?:string};
 const strategies=[["XAU/USD","Trend continuation"],["XAU/USD","Support/resistance reversal"],["EUR/USD","Range breakout"],["GBP/USD","Trend pullback"],["USD/JPY","Momentum confirmation"]];
@@ -28,7 +29,15 @@ export default function Opportunities(){
   <p>15m indicative closed-candle price: {typeof frame?.close==="number"?frame.close:"—"} · RSI: {typeof frame?.rsi14==="number"?frame.rsi14.toFixed(1):"—"}</p>
   <p>15m data: {frame?.error??frame?.asOf??"Unavailable"}</p><p>Candle patterns: {frame?.patterns?.join(", ")||"—"}</p>
   <p>Whale cross-check: <strong>{w?.whaleStatus??"UNAVAILABLE"}</strong> · Alignment: {w?.whaleAlignment??"UNKNOWN"}</p><p style={{fontSize:13}}>{w?.explanation??"Whale data is not yet verified"}</p><p>News: {m?.newsClearance??"UNAVAILABLE"}</p>
-  <p>Entry / stop / target: Not validated</p>
+  <section style={{borderTop:"1px solid #64748b",marginTop:12,paddingTop:12}}>
+  <strong>Hypothetical paper setup: {m?.paperSetup?.status??"UNAVAILABLE"}</strong>
+  <p>Direction: {m?.paperSetup?.side??"WAIT"}</p>
+  <p>Reference entry: {m?.paperSetup?.entry??"—"} · Stop: {m?.paperSetup?.stop??"—"} · Target: {m?.paperSetup?.target??"—"}</p>
+  <p>Reward/risk: {m?.paperSetup?.rewardRisk??"—"} · Expiry: {m?.paperSetup?.expiresAt??"—"}</p>
+  <p>Maximum hypothetical units at $2 risk: {m?.paperSetup?.maxUnitsAt2UsdRisk?.toFixed(4)??"—"} (not broker lots)</p>
+  <p style={{fontSize:13}}>{m?.paperSetup?.reason??"No validated paper setup"}</p>
+  <p style={{fontSize:12}}>Paper research only. No Octa bid/ask, contract size, spread, execution or whale confirmation. Never copy these prices directly into a live order.</p>
+  </section>
   <p style={{fontSize:13,opacity:.8}}>{m?.reason??"Awaiting market feed configuration"}</p>
  </article>;})}
  </div>
