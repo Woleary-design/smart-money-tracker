@@ -2,7 +2,7 @@
 import {useEffect,useState} from "react";
 type Trade={side:string;entry:number;stop:number;target:number;entryAt:string;exitAt:string;exit:number;result:string;r:number};
 type Summary={trades:number;wins:number;winRatePct:number|null;totalR:number;averageR:number|null;maxDrawdownR:number};
-type Report={diagnostics?:{exits:{STOP:Summary;TARGET:Summary;TIME:Summary};payoff:{averageWinnerR:number|null;averageLoserR:number|null;breakEvenRoundTripCostR:number|null};directional:{BUY:Summary;SELL:Summary};chronological:{earlier70Pct:Summary;later30Pct:Summary;cutoff:string;warning:string};costSensitivity:{assumedRoundTripCostR:number;totalNetR:number;averageNetR:number|null}[];costWarning:string};status:string;symbol?:string;asset?:string;source?:string;sample?:{candles:number;first:string;last:string};strategy?:string;results?:{trades:number;wins:number;losses:number;winRatePct:number|null;totalR:number;averageR:number|null;maxDrawdownR:number};trades?:Trade[];limitations?:string;error?:string;whaleFilterApplied?:boolean;transactionCostsIncluded?:boolean};
+type Report={dataQuality?:{gapsOver15Minutes:number;gapCrossingTrades:number;note:string};riskDiagnostics?:{maxConsecutiveLosingTrades:number;equityCurve:{time:string;cumulativeR:number}[]};diagnostics?:{exits:{STOP:Summary;TARGET:Summary;TIME:Summary};payoff:{averageWinnerR:number|null;averageLoserR:number|null;breakEvenRoundTripCostR:number|null};directional:{BUY:Summary;SELL:Summary};chronological:{earlier70Pct:Summary;later30Pct:Summary;cutoff:string;warning:string};costSensitivity:{assumedRoundTripCostR:number;totalNetR:number;averageNetR:number|null}[];costWarning:string};status:string;symbol?:string;asset?:string;source?:string;sample?:{candles:number;first:string;last:string};strategy?:string;results?:{trades:number;wins:number;losses:number;winRatePct:number|null;totalR:number;averageR:number|null;maxDrawdownR:number};trades?:Trade[];limitations?:string;error?:string;whaleFilterApplied?:boolean;transactionCostsIncluded?:boolean};
 export default function BacktestPage(){
  const [report,setReport]=useState<Report|null>(null),[loading,setLoading]=useState(true),[refresh,setRefresh]=useState(0);
  useEffect(()=>{let active=true;fetch("/api/historical-backtest",{cache:"no-store"}).then(async r=>{const j=await r.json();if(!r.ok)throw Error(j.error??"Backtest unavailable");return j;}).then(j=>{if(active)setReport(j);}).catch(e=>{if(active)setReport({status:"UNAVAILABLE",error:String(e)});}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[refresh]);
@@ -40,8 +40,23 @@ export default function BacktestPage(){
  {report.diagnostics.costSensitivity.map(c=><tr key={c.assumedRoundTripCostR}><td>{c.assumedRoundTripCostR}</td><td>{c.totalNetR}</td><td>{c.averageNetR??"—"}</td></tr>)}
  </tbody></table></div><p>{report.diagnostics.costWarning}</p>
  </section>}
+ {report?.riskDiagnostics&&<section style={{marginTop:24}}>
+ <h2>Equity curve (cumulative R, before costs)</h2>
+ <div style={{border:"1px solid #64748b",borderRadius:12,padding:12,overflow:"hidden"}}>
+ {(()=>{const pts=report.riskDiagnostics!.equityCurve;const values=pts.map(p=>p.cumulativeR);const low=Math.min(0,...values),high=Math.max(0,...values),range=high-low||1;
+ const poly=pts.map((p,i)=>((i/Math.max(pts.length-1,1))*1000).toFixed(2)+","+((high-p.cumulativeR)/range*190+10).toFixed(2)).join(" ");
+ const zeroY=(high/range*190+10).toFixed(2);
+ return <svg viewBox="0 0 1000 210" role="img" aria-label="Historical cumulative risk units across completed trades" style={{width:"100%",height:"auto"}}>
+ <line x1="0" y1={zeroY} x2="1000" y2={zeroY} stroke="#64748b" strokeDasharray="8 6"/>
+ <polyline points={poly} fill="none" stroke="#38bdf8" strokeWidth="3" vectorEffect="non-scaling-stroke"/>
+ </svg>;})()}
+ <p>Longest losing streak: <strong>{report.riskDiagnostics.maxConsecutiveLosingTrades} trades</strong></p>
+ </div></section>}
+ {report?.dataQuality&&<section style={{marginTop:20}}><h2>Historical data gaps</h2>
+ <p>Gaps longer than 15 minutes: <strong>{report.dataQuality.gapsOver15Minutes}</strong> · Simulated trades spanning gaps: <strong>{report.dataQuality.gapCrossingTrades}</strong></p>
+ <p>{report.dataQuality.note}</p></section>}
  {metrics?.trades===0&&<p>No qualifying trades in this sample. This is not evidence of profitability or safety.</p>}
- {report?.trades&&report.trades.length>0&&<section style={{overflowX:"auto",marginTop:24}}><h2>Most recent simulated trades</h2>
+ {report?.trades&&report.trades.length>0&&<section style={{overflowX:"auto",marginTop:24}}><h2>All simulated trades</h2>
  <table style={{borderCollapse:"collapse",width:"100%",fontSize:13}}><thead><tr>{["Entry time","Side","Entry","Stop","Target","Exit","Result","R"].map(x=><th key={x} style={{padding:8,textAlign:"left",borderBottom:"1px solid #64748b"}}>{x}</th>)}</tr></thead>
  <tbody>{report.trades.map((t,i)=><tr key={i}>{[t.entryAt,t.side,t.entry,t.stop,t.target,t.exit,t.result,t.r.toFixed(2)].map((v,j)=><td key={j} style={{padding:8,borderBottom:"1px solid #64748b"}}>{v}</td>)}</tr>)}</tbody></table></section>}
  <h2>What is missing</h2><p>Whale filter: {report?.whaleFilterApplied?"Applied":"Not applied"} · Trading costs: {report?.transactionCostsIncluded?"Included":"Not included"}</p>
