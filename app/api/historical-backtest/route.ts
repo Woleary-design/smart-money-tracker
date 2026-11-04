@@ -50,6 +50,19 @@ export async function GET(){
    // Re-entry only after the exit candle has completed; no overlapping positions.
    nextEligible=exitIndex+1;
   }
+  const gaps=candles.slice(1).flatMap((bar,i)=>{
+   const minutes=(Date.parse(bar.time)-Date.parse(candles[i].time))/60000;
+   return minutes>15?[{after:candles[i].time,before:bar.time,minutes}]:[];
+  });
+  const gapCrossingTrades=trades.filter(t=>gaps.some(g=>Date.parse(g.after)>=Date.parse(t.entryAt)&&Date.parse(g.before)<=Date.parse(t.exitAt))).length;
+  const equityCurve=[{time:trades[0]?.entryAt??candles[0].time,cumulativeR:0}];
+  let runningR=0,lossStreak=0,maxLossStreak=0;
+  for(const trade of trades){
+   runningR+=trade.r;
+   equityCurve.push({time:trade.exitAt,cumulativeR:+runningR.toFixed(4)});
+   lossStreak=trade.r<0?lossStreak+1:0;
+   maxLossStreak=Math.max(maxLossStreak,lossStreak);
+  }
   const totalR=trades.reduce((s,t)=>s+t.r,0);
   let equity=0,peak=0,maxDrawdownR=0;
   for(const t of trades){equity+=t.r;peak=Math.max(peak,equity);maxDrawdownR=Math.max(maxDrawdownR,peak-equity);}
@@ -80,8 +93,10 @@ export async function GET(){
    strategy:"15m EMA20/50/200 plus RSI directional bias; next-bar open entry; 1.5 ATR stop, 3 ATR target, 17 bars maximum, re-entry only after the exit candle",
    results:{trades:trades.length,wins,losses:trades.length-wins,winRatePct:trades.length?Math.round(wins/trades.length*10000)/100:null,
     totalR:Math.round(totalR*100)/100,averageR:trades.length?Math.round(totalR/trades.length*1000)/1000:null,maxDrawdownR:Math.round(maxDrawdownR*100)/100},
+   dataQuality:{gapsOver15Minutes:gaps.length,gapCrossingTrades,gapExamples:gaps.slice(0,8),note:"Market closures and missing provider bars can create gaps. Trades spanning gaps may have unrealistic simulated exits."},
+   riskDiagnostics:{maxConsecutiveLosingTrades:maxLossStreak,equityCurve},
    diagnostics:{directional,chronological,exits,payoff,costSensitivity:costs,costWarning:"Hypothetical costs in R, not measured Octa spreads, commissions or slippage. Do not treat these as verified broker costs."},
-   trades:trades.slice(-30),whaleFilterApplied:false,transactionCostsIncluded:false,
+   trades,whaleFilterApplied:false,transactionCostsIncluded:false,
    decision:"NOT_VALIDATED_FOR_LIVE_TRADING",
    limitations:"Entry at bar open and intrabar stops are hypothetical; re-entry starts after the exit bar. Short, nonrandom historical sample; no spread, commission, slippage, broker contract rules, news or institutional flow. Same-candle stop wins; gaps through stop use open. Candles may contain market gaps. Results are hypothetical and not predictive."},
    {headers:{"Cache-Control":"no-store"}});
