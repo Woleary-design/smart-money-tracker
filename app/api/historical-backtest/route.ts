@@ -53,10 +53,29 @@ export async function GET(){
   let equity=0,peak=0,maxDrawdownR=0;
   for(const t of trades){equity+=t.r;peak=Math.max(peak,equity);maxDrawdownR=Math.max(maxDrawdownR,peak-equity);}
   const wins=trades.filter(t=>t.r>0).length;
+  // Chronological diagnostic split only; strategy was already inspected on this sample.
+  const cutoff=Date.parse(candles[Math.floor(candles.length*0.7)].time);
+  const summarize=(subset:Trade[])=>{
+   const count=subset.length,net=subset.reduce((sum,t)=>sum+t.r,0);
+   const winning=subset.filter(t=>t.r>0).length;
+   let balance=0,peak=0,drawdown=0;
+   for(const t of subset){balance+=t.r;peak=Math.max(peak,balance);drawdown=Math.max(drawdown,peak-balance);}
+   return {trades:count,wins:winning,winRatePct:count?+(100*winning/count).toFixed(2):null,totalR:+net.toFixed(3),averageR:count?+(net/count).toFixed(3):null,maxDrawdownR:+drawdown.toFixed(3)};
+  };
+  const directional={BUY:summarize(trades.filter(t=>t.side==="BUY")),SELL:summarize(trades.filter(t=>t.side==="SELL"))};
+  const chronological={earlier70Pct:summarize(trades.filter(t=>Date.parse(t.entryAt)<cutoff)),
+   later30Pct:summarize(trades.filter(t=>Date.parse(t.entryAt)>=cutoff)),cutoff:new Date(cutoff).toISOString(),
+   warning:"Diagnostic split, NOT untouched out-of-sample validation: this historical sample was already examined."};
+  const costs=[0,0.05,0.1,0.2,0.3].map(costR=>({
+   assumedRoundTripCostR:costR,
+   totalNetR:+(totalR-costR*trades.length).toFixed(3),
+   averageNetR:trades.length?+((totalR-costR*trades.length)/trades.length).toFixed(3):null
+  }));
   return NextResponse.json({status:"HISTORICAL_RESEARCH_ONLY",symbol:"GC=F",asset:"COMEX gold futures proxy, not Octa XAU/USD",source:"Yahoo Finance public chart 15m",sample:{candles:candles.length,first:candles[0].time,last:candles.at(-1)?.time},
    strategy:"15m EMA20/50/200 plus RSI directional bias; next-bar open entry; 1.5 ATR stop, 3 ATR target, 17 bars maximum, one position at a time",
    results:{trades:trades.length,wins,losses:trades.length-wins,winRatePct:trades.length?Math.round(wins/trades.length*10000)/100:null,
     totalR:Math.round(totalR*100)/100,averageR:trades.length?Math.round(totalR/trades.length*1000)/1000:null,maxDrawdownR:Math.round(maxDrawdownR*100)/100},
+   diagnostics:{directional,chronological,costSensitivity:costs,costWarning:"Hypothetical costs in R, not measured Octa spreads, commissions or slippage. Do not treat these as verified broker costs."},
    trades:trades.slice(-30),whaleFilterApplied:false,transactionCostsIncluded:false,
    decision:"NOT_VALIDATED_FOR_LIVE_TRADING",
    limitations:"Short, nonrandom historical sample; no spread, commission, slippage, broker contract rules, news or institutional flow. Same-candle stop wins; gaps through stop use open. Candles may contain market gaps. Results are hypothetical and not predictive."},
