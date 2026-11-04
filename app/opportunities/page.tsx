@@ -9,7 +9,7 @@ export default function Opportunities(){
  useEffect(()=>{let active=true;fetch("/api/market-scan",{cache:"no-store"}).then(async r=>{const j=await r.json();if(!r.ok)throw Error(j.error||"Unavailable");return j;}).then(j=>{if(active)setScan(j);}).catch(e=>{if(active)setScan({status:"UNAVAILABLE",decision:"NO_VALIDATED_TRADES",reason:String(e)});}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[]);
  return <main style={{maxWidth:1050,margin:"36px auto",padding:"0 20px",fontFamily:"system-ui,sans-serif"}}>
  <a href="/">← Dashboard</a><h1>Trade Opportunity Board</h1>
- <p>Independent gold and forex technical scans. TradingView charts are available separately; these technical readings require a configured machine-readable candle feed.</p>
+ <p>Independent gold and forex technical scans. TradingView charts are available separately; the scanner now attempts public historical candles automatically. Gold uses a futures proxy, not Octa spot prices.</p>
  <section style={{padding:18,border:"1px solid #64748b",borderRadius:12,marginBottom:22}}>
   <h2>{loading?"Checking market feeds…":scan?.decision??"NO VALIDATED TRADES"}</h2>
   <p>Data status: {scan?.status??"Loading"} · Last check: {scan?.checkedAt??"Not available"}</p>
@@ -21,8 +21,8 @@ export default function Opportunities(){
  return <article key={i} style={{padding:18,border:"1px solid #64748b",borderRadius:12}}>
   <h2>{symbol}</h2><p><strong>{strategy}</strong></p>
   <p>Technical bias: <strong>{m?.technicalBias??"UNAVAILABLE"}</strong></p>
-  <p>15m closed-candle price: {typeof frame?.close==="number"?frame.close:"—"} · RSI: {typeof frame?.rsi14==="number"?frame.rsi14.toFixed(1):"—"}</p>
-  <p>Candle patterns: {frame?.patterns?.join(", ")||"—"}</p>
+  <p>15m indicative closed-candle price: {typeof frame?.close==="number"?frame.close:"—"} · RSI: {typeof frame?.rsi14==="number"?frame.rsi14.toFixed(1):"—"}</p>
+  <p>15m data: {frame?.error??frame?.asOf??"Unavailable"}</p><p>Candle patterns: {frame?.patterns?.join(", ")||"—"}</p>
   <p>Whales: {m?.whaleConfirmation??"UNAVAILABLE"} · News: {m?.newsClearance??"UNAVAILABLE"}</p>
   <p>Entry / stop / target: Not validated</p>
   <p style={{fontSize:13,opacity:.8}}>{m?.reason??"Awaiting market feed configuration"}</p>
