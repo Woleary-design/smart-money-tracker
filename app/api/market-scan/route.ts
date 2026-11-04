@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {evaluateCandles,type TechnicalReport} from "../../../lib/technicals";
 import type {Candle} from "../../../lib/candles";
+import {makePaperSetup} from "../../../lib/paper-setups";
 export const dynamic="force-dynamic";
 const symbols=["XAU/USD","EUR/USD","GBP/USD","USD/JPY"] as const;
 const intervals=["5min","15min","1h"] as const;
@@ -53,7 +54,8 @@ export async function GET(){
   const complete=intervals.every(i=>!("error" in frames[i]));
   const bias=complete&&intervals.every(i=>(frames[i] as TechnicalReport).status==="BULLISH_BIAS")?"BUY":
    complete&&intervals.every(i=>(frames[i] as TechnicalReport).status==="BEARISH_BIAS")?"SELL":"WAIT";
-  return {symbol,technicalBias:bias,frames,status:complete?"TECHNICALS_READY":"INCOMPLETE",tradeEligible:false,
+  const paperSetup=makePaperSetup(frames);
+  return {symbol,technicalBias:bias,frames,paperSetup,status:complete?"TECHNICALS_READY":"INCOMPLETE",tradeEligible:false,
    whaleConfirmation:"UNAVAILABLE",newsClearance:"UNAVAILABLE",brokerSpread:"UNAVAILABLE",
    reason:"Technical bias is not a validated trade; whale, event and broker-cost evidence is missing"};
  }));
