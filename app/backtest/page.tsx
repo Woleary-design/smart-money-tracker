@@ -2,7 +2,7 @@
 import {useEffect,useState} from "react";
 type Trade={side:string;entry:number;stop:number;target:number;entryAt:string;exitAt:string;exit:number;result:string;r:number};
 type Summary={trades:number;wins:number;winRatePct:number|null;totalR:number;averageR:number|null;maxDrawdownR:number};
-type Report={diagnostics?:{directional:{BUY:Summary;SELL:Summary};chronological:{earlier70Pct:Summary;later30Pct:Summary;cutoff:string;warning:string};costSensitivity:{assumedRoundTripCostR:number;totalNetR:number;averageNetR:number|null}[];costWarning:string};status:string;symbol?:string;asset?:string;source?:string;sample?:{candles:number;first:string;last:string};strategy?:string;results?:{trades:number;wins:number;losses:number;winRatePct:number|null;totalR:number;averageR:number|null;maxDrawdownR:number};trades?:Trade[];limitations?:string;error?:string;whaleFilterApplied?:boolean;transactionCostsIncluded?:boolean};
+type Report={diagnostics?:{exits:{STOP:Summary;TARGET:Summary;TIME:Summary};payoff:{averageWinnerR:number|null;averageLoserR:number|null;breakEvenRoundTripCostR:number|null};directional:{BUY:Summary;SELL:Summary};chronological:{earlier70Pct:Summary;later30Pct:Summary;cutoff:string;warning:string};costSensitivity:{assumedRoundTripCostR:number;totalNetR:number;averageNetR:number|null}[];costWarning:string};status:string;symbol?:string;asset?:string;source?:string;sample?:{candles:number;first:string;last:string};strategy?:string;results?:{trades:number;wins:number;losses:number;winRatePct:number|null;totalR:number;averageR:number|null;maxDrawdownR:number};trades?:Trade[];limitations?:string;error?:string;whaleFilterApplied?:boolean;transactionCostsIncluded?:boolean};
 export default function BacktestPage(){
  const [report,setReport]=useState<Report|null>(null),[loading,setLoading]=useState(true),[refresh,setRefresh]=useState(0);
  useEffect(()=>{let active=true;fetch("/api/historical-backtest",{cache:"no-store"}).then(async r=>{const j=await r.json();if(!r.ok)throw Error(j.error??"Backtest unavailable");return j;}).then(j=>{if(active)setReport(j);}).catch(e=>{if(active)setReport({status:"UNAVAILABLE",error:String(e)});}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[refresh]);
@@ -25,6 +25,12 @@ export default function BacktestPage(){
  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:12}}>
  {(["BUY","SELL"] as const).map(side=>{const d=report.diagnostics!.directional[side];return <div key={side} style={{border:"1px solid #64748b",padding:14,borderRadius:10}}><strong>{side}</strong><p>{d.trades} trades · {d.winRatePct??"—"}% wins</p><p>Total {d.totalR}R · Drawdown {d.maxDrawdownR}R</p></div>;})}
  </div>
+ <h2>Why trades closed</h2>
+ <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12}}>
+ {(["STOP","TARGET","TIME"] as const).map(reason=>{const d=report.diagnostics!.exits[reason];return <div key={reason} style={{border:"1px solid #64748b",padding:14,borderRadius:10}}><strong>{reason}</strong><p>{d.trades} trades</p><p>{d.totalR}R combined</p></div>;})}
+ </div>
+ <p>Average winning trade: {report.diagnostics.payoff.averageWinnerR??"—"}R · Average losing trade: {report.diagnostics.payoff.averageLoserR??"—"}R</p>
+ <p>Gross average per trade available to cover round-trip costs: {report.diagnostics.payoff.breakEvenRoundTripCostR??"—"}R. A negative figure means the strategy loses before costs.</p>
  <h2>Earlier vs later sample</h2><p>Cutoff: {report.diagnostics.chronological.cutoff}</p>
  <p>Earlier 70%: {report.diagnostics.chronological.earlier70Pct.trades} trades, {report.diagnostics.chronological.earlier70Pct.totalR}R</p>
  <p>Later 30%: {report.diagnostics.chronological.later30Pct.trades} trades, {report.diagnostics.chronological.later30Pct.totalR}R</p>
