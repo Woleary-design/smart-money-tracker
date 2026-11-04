@@ -29,6 +29,6 @@ export default function Opportunities(){
  </article>;})}
  </div>
  <p style={{marginTop:22}}>{scan?.warning??"Only validated evidence will be used to rank executable trade proposals."}</p>
- <p><a href="/paper-trade">Test a paper trade</a> · <a href="/tradingview">Open TradingView charts</a> · <a href="/api/market-scan">Inspect scan data</a></p>
+ <p><a href="/api/public-price?symbol=XAU%2FUSD">Check indicative gold quote</a> · <a href="/paper-trade">Test a paper trade</a> · <a href="/tradingview">Open TradingView charts</a> · <a href="/api/market-scan">Inspect scan data</a></p>
  </main>;
 }
